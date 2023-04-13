@@ -1,0 +1,192 @@
+name: "c2m_journal"
+suffix: ''
+
+dataset_params:
+  root: "/home/*/dataset_cityscape_video/leftImg8bit_sequence/"
+  dataset: "cityscapes"
+  train_images_path: 'train256_128/'
+  val_images_path: 'val256_128/'
+  train_data_list: 'cityscapes_train.txt'
+  val_data_list: 'cityscapes_val.txt'
+  train_segmasks_path: 'train_semantic_segmask256x128'
+  val_segmasks_path: 'val_semantic_segmask256x128'
+  segmask_suffix: 'ssmask.png'
+  train_instances_path: 'train_instance256x128'
+  val_instances_path: 'val_instance256x128'
+  instance_suffix: "gtFine_instanceIds.png"
+  train_tracking_path: 'train_instance_tracking_test'
+  val_tracking_path: 'val_instance_tracking_test'
+  train_bw_occ_path: 'train_bw_occlusion_128x256'
+  val_bw_occ_path: 'val_bw_occlusion_128x256'
+  bw_occ_suffix: "leftImg8bit_occlusion_bw.png"
+  train_bw_of_path: 'train_bw_optical_flow_128x256'
+  val_bw_of_path: 'val_bw_optical_flow_128x256'
+  bw_of_suffix: "leftImg8bit_flow_backward.flow"
+  train_fw_occ_path: 'train_fw_occlusion_128x256'
+  val_fw_occ_path: 'val_fw_occlusion_128x256'
+  fw_occ_suffix: "leftImg8bit_occlusion_fw.png"
+  train_fw_of_path: 'train_fw_optical_flow_128x256'
+  val_fw_of_path: 'val_fw_optical_flow_128x256'
+  fw_of_suffix: "leftImg8bit_flow_forward.flow"
+
+
+
+train_params:
+  num_input_frames: 1
+  num_predicted_frames: 5
+  input_size: [128, 256]
+  num_epochs: 300
+  lr_rate_d: 4.0e-4
+  lr_rate_g: 2.0e-4
+  lr_rate_gnn: 1.e-4
+  gamma_d: 0.8
+  gamma_g: 0.9
+  gamma_gnn: 1.0
+  milestone_start: 100
+  milestone_end: 400
+  milestone_every: 50
+  seed: 31415
+  batch_size: 3
+  workers: 4
+  local_world_size: 2
+  use_gt_training: True
+  use_gt_eval: False
+  use_pre_processed_of: True
+  use_fw_of: False
+  beta1: 0.5
+  beta2: 0.999
+  eps: 1e-7
+  continue_train: False
+  use_image_discriminator: True
+  use_video_discriminator: True
+  eval_freq: 4600
+  loss_weights:
+    flow_reconstruction: 10
+    flow_smooth: 0
+    flowcon: 0
+    reconstruction: 100
+    kl: 100
+    ssim: 10
+    perceptual: 10
+    occlusion_bw: 20
+    occlusion_fw: 20
+    g_gan_image: 1
+    g_gan_video: 1
+    feature_matching_image: 10
+    feature_matching_video: 10
+    warped: 100
+    scale: 2
+    rotation: 1
+    translation: 100
+
+
+
+
+model_params:
+  common_params:
+    scale_factor: 1
+    image_channel: 3
+    seg_channel_bg: 11
+    seg_channel_fg: 9
+    instance_channel: 1
+    flow_channel: 2
+    occlusion_channel: 1
+  motion_estimator:
+    sparse_motion_estimator:
+      h_dim: 512
+      z_dim: 1024
+      num_features_x: 23
+      num_features_y: 6
+    sparse_motion_encoder:
+      block_expansion: 32
+      num_down_blocks: 4
+      max_expansion: 512
+      in_channel: 2
+      padding_mode: "reflect"
+    dense_motion_encoder:
+      out_channel_bg: 512
+      out_channel_fg: 512
+      max_expansion: 512
+      block_expansion: 32
+      num_down_blocks: 6
+      padding_mode: "reflect"
+      t_kernel: [4,3,3,4,1,1,1]
+      h_kernel: [4,4,4,4,4, 4,3]
+      w_kernel: [4,4,4,4,4, 4,3]
+      t_stride: [2,1,1,2,1, 1,1]
+      h_stride: [2,2,2,2,2, 2,1]
+      w_stride: [2,2,2,2,2, 2,1]
+      t_padding: [1,1,1,1,0, 0,0]
+      h_padding: [1,1,1,1,1, 1,1]
+      w_padding: [1,1,1,1,1, 1,1]
+    dense_motion_decoder:
+      in_channel: 528
+      out_channel: 32
+      block_expansion: 32
+      max_expansion: 512
+      num_up_blocks: 5
+      padding_mode: "reflect"
+      use_appearance_feature: True
+      use_feature_resample: True
+  discriminator:
+    in_channel: 3
+    ndf: 32
+    n_layers_D: 4
+    num_D: 1
+    padding_mode: "reflect"
+  appearance_encoder:
+    block_expansion: 32
+    num_down_blocks: 6
+    max_expansion: 512
+    pooling_after: 2
+    padding_mode: "reflect"
+    pool_size: 7
+  generator:
+    block_expansion: 32
+    num_down_blocks: 3
+    max_expansion: 512
+    num_bottleneck_blocks: 4
+    padding_mode: "reflect"
+    use_skip: False
+  flow_embedder:
+    input_channel: 6
+    block_expansion: 32
+    num_down_blocks: 3
+    max_expansion: 512
+    padding_mode: "reflect"
+    use_decoder: True
+
+
+
+test_params:
+  phase: "test"
+  use_pre_processed_of: True
+  input_size: [128, 256]
+  seed: 31415
+  batch_size: 12
+  workers: 10
+  num_input_frames: 1
+  num_predicted_frames: 5
+  use_gt_eval: True
+  lambda_traj: 1
+  custom_test: True
+  yolo_version: 3
+  load_index_user_guidance: True
+  save_index_user_guidance: False
+  num_samples: 1
+  which_epoch: "latest"
+
+
+visualizer_params:
+  display_winsize: 512
+  tf_log: True
+  display_freq: 1460
+  print_freq: 400
+  save_latest_freq: 100
+  use_html: True
+  grid_size: [2,4]
+
+
+
+checkpoint_params:
+  save_epoch_freq: 10
