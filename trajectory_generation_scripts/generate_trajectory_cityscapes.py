@@ -8,10 +8,20 @@ import argparse
 parser = argparse.ArgumentParser(description='generate json')
 parser.add_argument('--phase', default='', type=str,
         help='phase')
+parser.add_argument('--images_root', default='', type=str,
+        help='images_root', required=True)
+parser.add_argument('--instance_root', default='', type=str,
+        help='instance_root', required=True)
+parser.add_argument('--tracker_root', default='', type=str,
+        help='tracker_root', required=True)
+parser.add_argument('--result_dir', default='', type=str,
+        help='result_dir', required=True)
+parser.add_argument('--object_instance_dir', default='', type=str,
+        help='object_instance_dir', required=True)
+parser.add_argument('--n_processes', default=1, type=int)
+
 args = parser.parse_args()
 phase = args.phase
-
-ImagesRoot = "/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/leftImg8bit_sequence/"
 
 import json
 from multiprocessing import Pool
@@ -33,7 +43,7 @@ def load_all_image_paths(image_dir, phase):
 				full_image_path = frame_dir + "/" + frame_list[k]
 				assert os.path.isfile(full_image_path)
 				image.append(full_image_path)
-			video.append((image))
+			video.append(image)
 	return video
 
 
@@ -96,17 +106,16 @@ class upsnet_instance():
 		return info_dict_more
 
 
-def tracking_list(i, j, initial_instance, image_paths, dict_all):
+def tracking_list(i, j, initial_instance, image_paths, frames_info):
 	# Each object is represented by a dict
 	# Name video_%d_frame_%d_object_%d
 
 	for k in range(len(initial_instance)):
-		dict = {}
-		dict['video_dir'] = 'video_%04d_frame_%02d_object_%02d' % (i, j, k)
-		dict['init_rect'] = initial_instance[k][2]
-		dict['img_names'] = image_paths
-		dict_all['video_%04d_frame_%02d_object_%02d' % (i, j, k)] = dict
-	return dict_all
+		object_info = {'video_dir': 'video_%04d_frame_%02d_object_%02d' % (i, j, k),
+					   'init_rect': initial_instance[k][2],
+					   'img_names': image_paths}
+		frames_info['video_%04d_frame_%02d_object_%02d' % (i, j, k)] = object_info
+	return frames_info
 
 
 def track_txt_reader(txt_name):
@@ -173,11 +182,10 @@ def match_instance_bbox(instance, bbox_tgt, cls_tgt):
 	return instance, max(enumerate(instances), key=lambda elem: max(elem[1]))[0] if found else -1
 
 
-InstanceRoot = f"/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/instances"
 upsnet_instance_readio = upsnet_instance()
-all_image_paths = load_all_image_paths(ImagesRoot, phase)
+all_image_paths = load_all_image_paths(args.images_root, phase)
 print("Loaded %d image paths = " % len(all_image_paths))
-dict_all = {}
+frames_info = {}
 
 
 def mkdir(path):
@@ -185,10 +193,10 @@ def mkdir(path):
 		os.makedirs(path)
 
 
-txt_root = f"/home/ardino/TransformerBasedC2M_debug/trajectory_generation_scripts/results_{phase}/cityscape/model/"
+txt_root = f"{args.tracker_root}/results_{phase}/cityscape/model/"
 
-result_dir = f"/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/instance_tracking/{phase}"
-mask_result_dir = f"/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/instance_mask/{phase}"
+result_dir = f"{args.result_dir}/{phase}"
+mask_result_dir = f"{args.object_instance_dir}/{phase}"
 
 
 def track_instance(i):
@@ -199,12 +207,12 @@ def track_instance(i):
 	j = 0
 	cnt_video = video_paths[j:j + 9]
 	init_video_frame = video_paths[j]
-	Instances_list = [None] * 9
+	instances_list = [None] * 9
 	for k in range(9):
-		Instances_list[k] = upsnet_instance_readio.readio_upsnet_instance(
-			InstanceRoot, phase, video_paths[j + k])
+		instances_list[k] = upsnet_instance_readio.readio_upsnet_instance(
+			args.instance_root, phase, video_paths[j + k])
 	# Instance is a list of image name, mask, bbox, cls, score
-	initial_instance = Instances_list[0]
+	initial_instance = instances_list[0]
 	if initial_instance is not None:
 		for tmp in range(len(initial_instance)):
 			# Load tracker for this instance
@@ -217,16 +225,18 @@ def track_instance(i):
 				mask_initial = initial_instance[tmp][1]
 				cls_initial = initial_instance[tmp][3]
 				# print("class", cls_initial)
-				masks_list.append([initial_instance[tmp][0], mask_initial, initial_instance[tmp][2], initial_instance[tmp][-1]])
+				masks_list.append([initial_instance[tmp][0],
+								   mask_initial, initial_instance[tmp][2],
+								   initial_instance[tmp][-1]])
 				# Test whether this track has correspondense in future frames one by one
 				for f in range(1, 9):
 					# bbox of tracker
 					bbox = tracker[f]
 
 					# instance this frame
-					instance = Instances_list[f]
+					instance = instances_list[f]
 
-					Instances_list[f], idx = match_instance_bbox(instance, bbox,
+					instances_list[f], idx = match_instance_bbox(instance, bbox,
 																 cls_initial)
 					if idx == -1:
 						# Don't have correspoding mask
@@ -252,16 +262,8 @@ def track_instance(i):
 								result_mask_object_path + f"{'_'.join([base_name, str(obj[3])])}.png")
 
 
-						#writer.write("\n".join([",".join(
-						#	map(str, tracker[i] + [masks_list[i][-1]])) for i in
-						#						range(len(masks_list))]))
-			# copyfile(track_txt, result_object_path + txt_file)
-
-
 if __name__=="__main__":
-	pool = Pool(processes=10)
+	pool = Pool(processes=args.n_processes)
 	pool.map(track_instance, np.arange(0,len(all_image_paths))) # range(0,1000) if you want to replicate your example
 	pool.close()
 	pool.join()
-	#for i in range(len(all_image_paths)):
-	#	track_instance(i)

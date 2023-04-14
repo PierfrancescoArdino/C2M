@@ -1,6 +1,4 @@
-### Script used for generating script for cityscapes dataset to gen training data for foreground object prediction
 import numpy as np
-import pandas as pd
 import os
 from PIL import Image
 import json
@@ -8,7 +6,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description='generate json')
 parser.add_argument('--phase', default='', type=str,
-        help='phase')
+        help='phase', required=True)
+parser.add_argument('--images_root', default='', type=str,
+        help='images_root', required=True)
+parser.add_argument('--instance_root', default='', type=str,
+        help='instance_root', required=True)
 args = parser.parse_args()
 phase = args.phase
 
@@ -107,10 +109,8 @@ def tracking_list(i,j,initial_instance, image_paths, dict_all):
 	return dict_all
 
 
-ImagesRoot = "/home/pardino/dataset_kitti_video/leftImg8bit_sequence/"
-InstanceRoot = f"/home/pardino/dataset_kitti_video/leftImg8bit_sequence/{phase}_instance"
 upsnet_instance_readio = upsnet_instance()
-all_image_paths = load_all_image_paths(ImagesRoot, phase)
+all_image_paths = load_all_image_paths(args.images_root, phase)
 print("Loaded %d image paths = "%len(all_image_paths))
 
 st = 0
@@ -121,7 +121,7 @@ for st in range(len(all_image_paths)):
 	for j in range(0,len(video_paths) - 5,6):
 		cnt_video = [video_paths[i] for i in range(j,j+6)]
 		init_video_frame = video_paths[j]
-		instance_io = upsnet_instance_readio.readio_upsnet_instance(InstanceRoot, phase, init_video_frame)
+		instance_io = upsnet_instance_readio.readio_upsnet_instance(args.instance_root, phase, init_video_frame)
 		#for k in range(len(instance_io)):
 		#print(instance_io[k])
 		if instance_io is None:
@@ -131,7 +131,3 @@ for st in range(len(all_image_paths)):
 
 with open(f"kitti360_{0}_{len(all_image_paths)}_with_instances_id_{phase}.json", 'w') as fp:
 	json.dump(dict_all, fp)
-
-#save_dir = "/disk1/yue/cityscapes/cityscapes/instance_upsnet/dict/"
-
-#rgb_full_name = ImageRoot + "aachen/aachen_000000_000000_leftImg8bit.png"

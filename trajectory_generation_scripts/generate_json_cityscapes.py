@@ -1,6 +1,4 @@
-### Script used for generating script for cityscapes dataset to gen training data for foreground object prediction
 import numpy as np
-import pandas as pd
 import os
 from PIL import Image
 import json
@@ -8,7 +6,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description='generate json')
 parser.add_argument('--phase', default='', type=str,
-        help='phase')
+        help='phase', required=True)
+parser.add_argument('--images_root', default='', type=str,
+        help='images_root', required=True)
+parser.add_argument('--instance_root', default='', type=str,
+        help='instance_root', required=True)
 args = parser.parse_args()
 phase = args.phase
 
@@ -27,7 +29,7 @@ def load_all_image_paths(image_dir, phase):
 				full_image_path = frame_dir + "/" + frame_list[k]
 				assert os.path.isfile(full_image_path)
 				image.append(full_image_path)                   
-			video.append((image))
+			video.append(image)
 	return video
 
 # Utils for reading in upsnet instance result
@@ -91,47 +93,39 @@ class upsnet_instance():
 		return info_dict_more
 
 
-def tracking_list(i,j,initial_instance, image_paths, dict_all):
+def tracking_list(i,j,initial_instance, image_paths, frames_info):
 	# Each object is represented by a dict
 	# Name video_%d_frame_%d_object_%d
 	
 	for k in range(len(initial_instance)):
-		dict = {}
-		dict['video_dir'] = 'video_%04d_frame_%02d_object_%02d'%(i,j,k)
-		dict['init_rect'] = initial_instance[k][2]
-		dict['img_names'] = image_paths
-		dict["instance_id"] = str(initial_instance[k][-1])
-		dict_all['video_%04d_frame_%02d_object_%02d'%(i,j,k)] = dict
-	return dict_all
+		object_info = {'video_dir': 'video_%04d_frame_%02d_object_%02d' % (i, j, k),
+					   'init_rect': initial_instance[k][2],
+					   'img_names': image_paths,
+					   "instance_id": str(initial_instance[k][-1])}
+		frames_info['video_%04d_frame_%02d_object_%02d'%(i,j,k)] = object_info
+	return frames_info
 
 
-ImagesRoot = "/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/leftImg8bit_sequence/"
-InstanceRoot = f"/home/ardino/dataset_cityscape_video/leftImg8bit_sequence/instances"
 upsnet_instance_readio = upsnet_instance()
-all_image_paths = load_all_image_paths(ImagesRoot, phase)
+all_image_paths = load_all_image_paths(args.images_root, phase)
 print("Loaded %d image paths = "%len(all_image_paths))
 
-st = 0
-dict_all = {}
-for st in range(len(all_image_paths)):
-	if st == 2232:
+video_index = 0
+frame_info = {}
+for video_index in range(len(all_image_paths)):
+	if video_index == 2232:
 		continue
-	print("video %04d" % st)
+	print("video %04d" % video_index)
 	j = 0
-	video_paths = all_image_paths[st]
+	video_paths = all_image_paths[video_index]
 	cnt_video = video_paths[j:j+9]
 	init_video_frame = video_paths[j]
-	instance_io = upsnet_instance_readio.readio_upsnet_instance(InstanceRoot, phase, init_video_frame)
-	#for k in range(len(instance_io)):
-	#print(instance_io[k])
+	instance_io = upsnet_instance_readio.readio_upsnet_instance(args.instance_root, phase, init_video_frame)
 	if instance_io is None:
 		continue
-	dict_all = tracking_list(st, j, instance_io, cnt_video, dict_all)
+	frame_info = tracking_list(video_index, j, instance_io, cnt_video, frame_info)
 		
 
 with open(f"cityscapes_{0}_{len(all_image_paths)}_{phase}.json", 'w') as fp:
-	json.dump(dict_all, fp)
+	json.dump(  frame_info, fp)
 
-#save_dir = "/disk1/yue/cityscapes/cityscapes/instance_upsnet/dict/"
-
-#rgb_full_name = ImageRoot + "aachen/aachen_000000_000000_leftImg8bit.png"
