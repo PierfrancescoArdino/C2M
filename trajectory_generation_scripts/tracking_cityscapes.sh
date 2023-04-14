@@ -1,4 +1,4 @@
 python -u test_cityscapes.py \
-	--snapshot model.pth 	\
+	--snapshot MODEL_NAME 	\
 	--dataset cityscape 	\
 	--config config.yaml

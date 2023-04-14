@@ -78,3 +78,21 @@ WIP
   ```
 
 ### 2.2 Generate object trajectories
+
+
+### 3 Train the model
+  We store the configuration of the model as a ```YAML``` configuration file. You can have a look at a base configuration in ```src/config/c2m_journal_cityscapes.yaml```.
+  The training file takes as input the following parameters:
+  - ```config```: path to configuration file
+  - ```device_ids```: names of the devices comma separated
+  - ```seed```: seed of the training
+  - ```profile```: debug using PyTorch profiler
+
+  Our code support multi-gpu training using ```DistributedDataParallel```. Here's an example of how you can run the code with one or more gpus.
+#### Single gpu
+  ```python train.py --device_ids 0 --config config/c2m_journal_cityscapes.yaml```
+#### Multi gpu
+ ```python -m torch.distributed.run --nnodes=1 --nproc_per_node=2 train.py --device_ids 0,1 --config config/c2m_journal_cityscapes.yaml```
+  The example considers a scenario with a single node and two gpus per node. Please change according to your needs. For more information check the [DDP example](https://github.com/pytorch/examples/tree/master/distributed/ddp)
+### 4 Test the model
+  ```python test.py --device_ids 0 --config config/c2m_journal_cityscapes.yaml```
